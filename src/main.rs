@@ -2,7 +2,7 @@ use std::io;
 use chumsky::prelude::*;
 
 fn main() {
-    println!("Felicity 0.1.0 ready.\n");
+    println!("Novarc 0.1.0 ready.\n");
 
     let mut line = String::new();
     loop {
