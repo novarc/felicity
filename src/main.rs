@@ -1,5 +1,5 @@
-use std::io;
 use chumsky::prelude::*;
+use rustyline;
 
 #[derive(Debug)]
 enum Expr {
@@ -109,28 +109,43 @@ fn eval<'a>(expr: &'a Expr, vars: &mut Vec<(&'a String, f64)>) -> Result<f64, St
     }
 }
 
-fn main() {
-    println!("Novarc 0.1.0 ready.");
-
-    loop {
-        println!();
-        let mut line = String::new();
-        io::stdin()
-            .read_line(&mut line)
-            .expect("Failed to read line");
-
-        let expr = parser().parse(line.clone());
-        match expr {
-            Ok(ast) => {
-                println!("AST: {:?}", ast);
-                match eval(&ast, &mut Vec::new()) {
-                    Ok(output) => println!("Eval Result: {}", output),
-                    Err(eval_err) => println!("Evaluation error: {}", eval_err),
-                }
+fn exec(line: String) {
+    let parse_result = parser().parse(line.clone());
+    match parse_result {
+        Ok(ast) => {
+            println!("AST: {:?}", ast);
+            match eval(&ast, &mut Vec::new()) {
+                Ok(output) => println!("Eval Result: {}", output),
+                Err(eval_err) => println!("Evaluation error: {}", eval_err),
             }
-            Err(parse_errs) => parse_errs
-                .into_iter()
-                .for_each(|e| println!("Parse error: {}", e)),
+        }
+        Err(parse_errs) => parse_errs
+            .into_iter()
+            .for_each(|e| println!("Parse error: {}", e)),
+    }
+}
+
+fn repl() -> rustyline::Result<()> {
+    let mut rl = rustyline::DefaultEditor::new()?;
+    let _ = rl.load_history("repl_history.txt").is_err();
+    loop {
+        let readline = rl.readline(">> ");
+        match readline {
+            Ok(line) => {
+                let _ = rl.add_history_entry(line.as_str());
+                exec(line);
+            }
+            Err(_) => {
+                break;
+            }
         }
     }
+    let _ = rl.save_history("repl_history.txt");
+    Ok(())
+}
+
+fn main() -> rustyline::Result<()> {
+    println!("Novarc 0.1.0 ready.");
+
+    repl()
 }
