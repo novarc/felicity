@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 chumsky = "~0"
+ariadne = "~0"
 rustyline = "~14"

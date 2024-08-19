@@ -1,4 +1,5 @@
 use chumsky::prelude::*;
+use ariadne::{Color, Label, Report, ReportKind, Source};
 use rustyline;
 
 #[derive(Debug)]
@@ -173,15 +174,30 @@ fn exec(line: String) {
     let parse_result = parser().parse(line.clone());
     match parse_result {
         Ok(ast) => {
-            println!("AST: {:?}", ast);
+            println!("AST: {:#?}", ast);
             match eval(&ast, &mut Vec::new(), &mut Vec::new()) {
                 Ok(output) => println!("Eval Result: {}", output),
                 Err(eval_err) => println!("Evaluation error: {}", eval_err),
             }
         }
-        Err(parse_errs) => parse_errs
-            .into_iter()
-            .for_each(|e| println!("Parse error: {}", e)),
+        Err(parse_errs) => {
+            for err in parse_errs {
+                Report::build(ReportKind::Error, (), err.span().start)
+                    .with_code(3)
+                    .with_message(err.to_string())
+                    .with_label(
+                        Label::new(err.span())
+                            .with_message(err.to_string())
+                            .with_color(Color::Red),
+                    )
+                    .finish()
+                    .eprint(Source::from(line.clone()))
+                    .unwrap();
+            }
+        }
+        // parse_errs
+        //     .into_iter()
+        //     .for_each(|e| println!("Parse error: {}", e)),
     }
 }
 
