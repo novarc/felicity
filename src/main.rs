@@ -221,7 +221,7 @@ fn repl() -> rustyline::Result<()> {
 }
 
 fn main() -> rustyline::Result<()> {
-    println!("Felicity 0.1.0 ready.");
+    println!("Novarc 0.1.0 ready.");
 
     repl()
 }
