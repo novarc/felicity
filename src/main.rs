@@ -193,6 +193,8 @@ fn exec(line: String) {
                 Ok(output) => println!("Eval Result: {}", output),
                 Err(eval_err) => println!("Evaluation error: {}", eval_err),
             }
+            println!("Compiling...");
+            let _ = compile(&ast);
         }
         Err(parse_errs) => {
             for err in parse_errs {
@@ -246,19 +248,71 @@ https://github.com/zesterer/chumsky/blob/main/examples/foo.rs
 https://github.com/0xd34d10cc/nox-rs/blob/master/src/jit/compiler.rs
 */
 
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use dynasmrt::{dynasm, DynamicLabel, DynasmApi, DynasmLabelApi};
 
 use std::{io, slice, mem};
 use std::io::Write;
+
+#[allow(unused_variables)]
+#[allow(dead_code)]
+fn compile<'a>(
+    expr: &'a Expr,
+) -> Result<f64, String> {
+    
+
+    fn traverse<'a>(
+        expr: &'a Expr,
+        vars: &mut Vec<(&'a String, f64)>,
+        funcs: &mut Vec<(&'a String, &'a [String], &'a Expr)>,
+    ) -> Result<f64, String> {
+        match expr {
+            Expr::Num(x) => Ok(*x),
+            Expr::Neg(a) => Ok(-traverse(a, vars, funcs)?),
+            Expr::Add(a, b) => Ok(traverse(a, vars, funcs)? + traverse(b, vars, funcs)?),
+            Expr::Sub(a, b) => Ok(traverse(a, vars, funcs)? - traverse(b, vars, funcs)?),
+            Expr::Mul(a, b) => Ok(traverse(a, vars, funcs)? * traverse(b, vars, funcs)?),
+            Expr::Div(a, b) => Ok(traverse(a, vars, funcs)? / traverse(b, vars, funcs)?),
+            Expr::Var(name) => {
+                unimplemented!();
+            }
+            Expr::Let { name, rhs, then } => {
+                unimplemented!();
+            }
+            Expr::Call(name, args) => {
+                unimplemented!();
+    
+            }
+            Expr::Fn {
+                name,
+                args,
+                body,
+                then,
+            } => {
+                unimplemented!();
+            }
+        }
+    }
+
+    traverse(expr, &mut Vec::new(), &mut Vec::new())
+}
 
 fn welcome() {
     let mut ops = dynasmrt::x64::Assembler::new().unwrap();
     let welcome = "Felicity 0.1.0 ready.\n";
 
+    let v1 = ops.new_dynamic_label();
+    let a1 = 1.5;
+    let v2: DynamicLabel = ops.new_dynamic_label();
+    let a2 = 5.0;
+
     dynasm!(ops
         ; .arch x64
         ; ->hello:
         ; .bytes welcome.as_bytes()
+        ; =>v1
+        ; .f64 a1
+        ; =>v2
+        ; .f64 a2
     );
 
     let hello = ops.offset();
@@ -268,17 +322,24 @@ fn welcome() {
         ; xor edx, edx
         ; mov dl, BYTE welcome.len() as _
         ; mov rax, QWORD print as _
-        ; sub rsp, BYTE 0x28
+        ; sub rsp, 0x28
         ; call rax
-        ; add rsp, BYTE 0x28
+        ; add rsp, 0x28
+
+        // ; lea rbx, [v1]
+        // ; fld rbx
+        // ; lea rbx, [v2]
+        // ; fld rbx
+        // ; faddp
+
         ; ret
     );
 
     let buf = ops.finalize().unwrap();
 
-    let hello_fn: extern "win64" fn() -> bool = unsafe { mem::transmute(buf.ptr(hello)) };
+    let welcome_fn: extern "win64" fn() -> bool = unsafe { mem::transmute(buf.ptr(hello)) };
 
-    assert!(hello_fn());
+    assert!(welcome_fn());
 }
 
 pub extern "win64" fn print(buffer: *const u8, length: u64) -> bool {
