@@ -1,3 +1,6 @@
+#[cfg(not(target_arch = "x86_64"))]
+compile_error!("Only x86-64 is supported");
+
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use chumsky::prelude::*;
 use rustyline;
@@ -231,7 +234,55 @@ fn repl() -> rustyline::Result<()> {
 }
 
 fn main() -> rustyline::Result<()> {
-    println!("Felicity 0.1.0 ready.");
+    welcome();
 
     repl()
+}
+
+/*
+https://github.com/zesterer/chumsky/blob/main/examples/foo.rs
+    https://github.com/zesterer/chumsky/blob/main/examples/sample.foo
+
+https://github.com/0xd34d10cc/nox-rs/blob/master/src/jit/compiler.rs
+*/
+
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+
+use std::{io, slice, mem};
+use std::io::Write;
+
+fn welcome() {
+    let mut ops = dynasmrt::x64::Assembler::new().unwrap();
+    let welcome = "Felicity 0.1.0 ready.\n";
+
+    dynasm!(ops
+        ; .arch x64
+        ; ->hello:
+        ; .bytes welcome.as_bytes()
+    );
+
+    let hello = ops.offset();
+    dynasm!(ops
+        ; .arch x64
+        ; lea rcx, [->hello]
+        ; xor edx, edx
+        ; mov dl, BYTE welcome.len() as _
+        ; mov rax, QWORD print as _
+        ; sub rsp, BYTE 0x28
+        ; call rax
+        ; add rsp, BYTE 0x28
+        ; ret
+    );
+
+    let buf = ops.finalize().unwrap();
+
+    let hello_fn: extern "win64" fn() -> bool = unsafe { mem::transmute(buf.ptr(hello)) };
+
+    assert!(hello_fn());
+}
+
+pub extern "win64" fn print(buffer: *const u8, length: u64) -> bool {
+    io::stdout()
+        .write_all(unsafe { slice::from_raw_parts(buffer, length as usize) })
+        .is_ok()
 }
